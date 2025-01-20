@@ -1,8 +1,26 @@
 import pygame
 import random
+import pygame.mixer
+
 
 # Initialize Pygame
 pygame.init()
+
+# Initialize the mixer
+pygame.mixer.init()
+
+# Load sound effects
+shoot_sound = pygame.mixer.Sound('shooting_sound.mp3')
+explosion_sound = pygame.mixer.Sound('explosion_sound.mp3')
+
+shoot_sound.set_volume(0.5)
+explosion_sound.set_volume(0.7)
+
+# Load background music (optional)
+pygame.mixer.music.load('background_music.mp3')
+pygame.mixer.music.set_volume(0.3)
+pygame.mixer.music.play(-1)  # Loop the music indefinitely
+
 
 # Game settings
 WIDTH = 800
@@ -15,7 +33,7 @@ RED = (255, 0, 0)
 
 # Set up the display
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
-pygame.display.set_caption('Basic Space Invaders')
+pygame.display.set_caption('Space Invaders')
 
 # Player settings
 player_width = 50
@@ -23,6 +41,7 @@ player_height = 50
 player_x = WIDTH // 2 - player_width // 2
 player_y = HEIGHT - 60
 player_speed = 5
+player_lives = 3
 
 # Bullet settings
 bullet_width = 5
@@ -35,52 +54,91 @@ enemy_width = 40
 enemy_height = 40
 enemy_speed = 3
 enemies = []
+enemy_direction = 1  # 1 means moving right, -1 means moving left
 
+# Score and level settings
+score = 0
+level = 1
 
 # Function to draw player
 def draw_player(x, y):
     pygame.draw.rect(screen, GREEN, (x, y, player_width, player_height))
 
-
 # Function to draw a bullet
 def draw_bullet(bullet):
     pygame.draw.rect(screen, WHITE, (bullet[0], bullet[1], bullet_width, bullet_height))
-
 
 # Function to draw an enemy
 def draw_enemy(x, y):
     pygame.draw.rect(screen, RED, (x, y, enemy_width, enemy_height))
 
-
-# Create enemies
+# Create enemies based on the current level
 def create_enemies():
-    for i in range(5):
-        for j in range(4):
+    global enemies
+    enemies.clear()  # Clear existing enemies
+    num_enemies = level * 5  # Increase number of enemies with each level
+    for i in range(num_enemies // 2):
+        for j in range(2):
             enemy_x = 100 * i + 50
             enemy_y = 50 * j + 50
             enemies.append([enemy_x, enemy_y])
 
-
-# Move enemies down the screen
+# Move enemies (left-right motion + down)
 def move_enemies():
+    global player_lives, enemy_direction
     for enemy in enemies:
-        enemy[1] += enemy_speed
-
+        enemy[0] += enemy_speed * enemy_direction  # Move left-right
+        if enemy[0] <= 0 or enemy[0] >= WIDTH - enemy_width:
+            enemy_direction *= -1  # Reverse direction when hitting the edge
+            for e in enemies:
+                e[1] += 10  # Move all enemies down when the direction reverses
+                if e[1] > HEIGHT - enemy_height:  # Check if an enemy hits the bottom
+                    player_lives -= 1
+                    enemies.remove(e)
 
 # Check for collisions
 def check_collisions():
+    global score
     global enemies, bullets
     for bullet in bullets[:]:
         for enemy in enemies[:]:
             if enemy[0] < bullet[0] < enemy[0] + enemy_width and enemy[1] < bullet[1] < enemy[1] + enemy_height:
                 enemies.remove(enemy)
                 bullets.remove(bullet)
+                score += 10  # Increase score when an enemy is hit
+                explosion_sound.play()
                 break
 
+# Display the score, level, and lives on the screen
+def display_score_and_lives():
+    font = pygame.font.SysFont(None, 30)
+    score_text = font.render(f"Score: {score}", True, WHITE)
+    lives_text = font.render(f"Lives: {player_lives}", True, WHITE)
+    level_text = font.render(f"Level: {level}", True, WHITE)
+    screen.blit(score_text, (10, 10))
+    screen.blit(lives_text, (WIDTH - 150, 10))
+    screen.blit(level_text, (WIDTH // 2 - 60, 10))
+
+# Game Over screen
+def game_over():
+    font = pygame.font.SysFont(None, 50)
+    game_over_text = font.render("GAME OVER", True, RED)
+    score_text = font.render(f"Final Score: {score}", True, WHITE)
+    screen.blit(game_over_text, (WIDTH // 2 - 150, HEIGHT // 2 - 50))
+    screen.blit(score_text, (WIDTH // 2 - 150, HEIGHT // 2 + 20))
+    pygame.display.flip()
+    pygame.time.delay(3000)  # Show Game Over screen for 3 seconds
+
+# Start the next level
+def next_level():
+    global level, enemy_speed
+    level += 1
+    enemy_speed += 1  # Increase enemy speed with each level
+    create_enemies()
 
 # Main game loop
 def main():
-    global player_x, bullets, enemies
+    global player_x, bullets, enemies, player_lives, score, enemy_direction, level
 
     clock = pygame.time.Clock()
     create_enemies()
@@ -94,13 +152,20 @@ def main():
             if event.type == pygame.QUIT:
                 running = False
             elif event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_LEFT and player_x > 0:
-                    player_x -= player_speed
-                elif event.key == pygame.K_RIGHT and player_x < WIDTH - player_width:
-                    player_x += player_speed
-                elif event.key == pygame.K_SPACE:
+                if event.key == pygame.K_SPACE:
                     bullet = [player_x + player_width // 2 - bullet_width // 2, player_y]
                     bullets.append(bullet)
+                    shoot_sound.play()
+
+                    # Get mouse position and update player's position
+        mouse_x, _ = pygame.mouse.get_pos()
+        player_x = mouse_x - player_width // 2  # Center player on the mouse x position
+
+        # Limit player's movement to within screen boundaries
+        if player_x < 0:
+            player_x = 0
+        elif player_x > WIDTH - player_width:
+            player_x = WIDTH - player_width
 
         # Move bullets
         for bullet in bullets[:]:
@@ -113,6 +178,10 @@ def main():
 
         # Check for collisions
         check_collisions()
+
+        # If all enemies are cleared, go to next level
+        if len(enemies) == 0:
+            next_level()
 
         # Draw everything
         screen.fill(BLACK)
@@ -128,18 +197,20 @@ def main():
         for enemy in enemies:
             draw_enemy(enemy[0], enemy[1])
 
-        # Game over if enemies reach the bottom
-        for enemy in enemies:
-            if enemy[1] > HEIGHT - enemy_height:
-                running = False
+        # Display score, level, and lives
+        display_score_and_lives()
+
+        # Game Over if no lives left
+        if player_lives <= 0:
+            game_over()
+            running = False
 
         # Update the display
         pygame.display.flip()
 
-    # Game over screen
-    print("Game Over")
+    # Quit the game
+    pygame.mixer.music.stop()
     pygame.quit()
-
 
 # Run the game
 if __name__ == "__main__":
