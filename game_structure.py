@@ -60,17 +60,37 @@ enemy_direction = 1  # 1 means moving right, -1 means moving left
 score = 0
 level = 1
 
-# Function to draw player
-def draw_player(x, y):
-    pygame.draw.rect(screen, GREEN, (x, y, player_width, player_height))
 
-# Function to draw a bullet
-def draw_bullet(bullet):
-    pygame.draw.rect(screen, WHITE, (bullet[0], bullet[1], bullet_width, bullet_height))
+# Matrix for Player (Spaceship) and Enemy (Alien)
+PLAYER_MATRIX = [
+    [0, 0, 1, 1, 0],
+    [0, 1, 0, 0, 1],
+    [1, 1, 1, 1, 1],
+    [0, 0, 1, 1, 0],
+    [0, 0, 0, 0, 0]
+]
 
-# Function to draw an enemy
-def draw_enemy(x, y):
-    pygame.draw.rect(screen, RED, (x, y, enemy_width, enemy_height))
+ENEMY_MATRIX = [
+    [0, 1, 1, 1, 0],
+    [1, 0, 1, 0, 1],
+    [1, 1, 1, 1, 1],
+    [0, 1, 1, 1, 0],
+    [0, 0, 0, 0, 0]
+]
+
+BULLET_MATRIX = [
+    [1],
+    [1],
+    [1]
+]
+
+# Function to draw a matrix object (player, enemy, bullet)
+def draw_matrix(matrix, x, y, size=10):
+    for row_index, row in enumerate(matrix):
+        for col_index, cell in enumerate(row):
+            if cell == 1:
+                pygame.draw.rect(screen, WHITE, (x + col_index * size, y + row_index * size, size, size))
+
 
 # Create enemies based on the current level
 def create_enemies():
@@ -82,6 +102,7 @@ def create_enemies():
             enemy_x = 100 * i + 50
             enemy_y = 50 * j + 50
             enemies.append([enemy_x, enemy_y])
+
 
 # Move enemies (left-right motion + down)
 def move_enemies():
@@ -96,6 +117,7 @@ def move_enemies():
                     player_lives -= 1
                     enemies.remove(e)
 
+
 # Check for collisions
 def check_collisions():
     global score
@@ -109,6 +131,7 @@ def check_collisions():
                 explosion_sound.play()
                 break
 
+
 # Display the score, level, and lives on the screen
 def display_score_and_lives():
     font = pygame.font.SysFont(None, 30)
@@ -118,6 +141,7 @@ def display_score_and_lives():
     screen.blit(score_text, (10, 10))
     screen.blit(lives_text, (WIDTH - 150, 10))
     screen.blit(level_text, (WIDTH // 2 - 60, 10))
+
 
 # Game Over screen
 def game_over():
@@ -129,12 +153,14 @@ def game_over():
     pygame.display.flip()
     pygame.time.delay(3000)  # Show Game Over screen for 3 seconds
 
+
 # Start the next level
 def next_level():
     global level, enemy_speed
     level += 1
     enemy_speed += 1  # Increase enemy speed with each level
     create_enemies()
+
 
 # Main game loop
 def main():
@@ -157,7 +183,7 @@ def main():
                     bullets.append(bullet)
                     shoot_sound.play()
 
-                    # Get mouse position and update player's position
+        # Get mouse position and update player's position
         mouse_x, _ = pygame.mouse.get_pos()
         player_x = mouse_x - player_width // 2  # Center player on the mouse x position
 
@@ -187,15 +213,15 @@ def main():
         screen.fill(BLACK)
 
         # Draw player
-        draw_player(player_x, player_y)
+        draw_matrix(PLAYER_MATRIX, player_x, player_y)
 
         # Draw bullets
         for bullet in bullets:
-            draw_bullet(bullet)
+            draw_matrix(BULLET_MATRIX, bullet[0], bullet[1])
 
         # Draw enemies
         for enemy in enemies:
-            draw_enemy(enemy[0], enemy[1])
+            draw_matrix(ENEMY_MATRIX, enemy[0], enemy[1])
 
         # Display score, level, and lives
         display_score_and_lives()
@@ -211,6 +237,7 @@ def main():
     # Quit the game
     pygame.mixer.music.stop()
     pygame.quit()
+
 
 # Run the game
 if __name__ == "__main__":
