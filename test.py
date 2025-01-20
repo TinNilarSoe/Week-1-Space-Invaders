@@ -1,5 +1,23 @@
 import pygame
+import pygame.mixer
+
 # import random
+
+# Initialize the mixer
+pygame.mixer.init()
+
+# Load sound effects
+shoot_sound = pygame.mixer.Sound('shooting_sound.mp3')
+explosion_sound = pygame.mixer.Sound('explosion_sound.mp3')
+
+shoot_sound.set_volume(0.5)  # Adjust volume for shooting sound
+explosion_sound.set_volume(0.7)  # Adjust volume for explosion sound
+
+# Load background music (optional)
+pygame.mixer.music.load('background_music.mp3')
+pygame.mixer.music.set_volume(0.3)
+pygame.mixer.music.play(-1)
+
 
 # Initialize Pygame
 pygame.init()
@@ -75,7 +93,8 @@ def check_collisions():
             if enemy[0] < bullet[0] < enemy[0] + enemy_width and enemy[1] < bullet[1] < enemy[1] + enemy_height:
                 enemies.remove(enemy)
                 bullets.remove(bullet)
-                break
+                explosion_sound.play()
+            break
 
 
 # Main game loop
@@ -101,8 +120,9 @@ def main():
                 elif event.key == pygame.K_SPACE:
                     bullet = [player_x + player_width // 2 - bullet_width // 2, player_y]
                     bullets.append(bullet)
+                    shoot_sound.play()
 
-        # Move bullets
+                    # Move bullets
         for bullet in bullets[:]:
             bullet[1] -= bullet_speed
             if bullet[1] < 0:
@@ -138,6 +158,7 @@ def main():
 
     # Game over screen
     print("Game Over")
+    pygame.mixer.music.stop()
     pygame.quit()
 
 
