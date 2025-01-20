@@ -1,5 +1,6 @@
 import pygame
 import random
+import time
 
 # Initialize Pygame
 pygame.init()
@@ -7,173 +8,202 @@ pygame.init()
 # Game settings
 WIDTH = 800
 HEIGHT = 600
-FPS = 60
+FPS = 120  # Increased frame rate
 WHITE = (255, 255, 255)
 BLACK = (0, 0, 0)
-GREEN = (0, 255, 0)
-RED = (255, 0, 0)
 
 # Set up the display
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
-pygame.display.set_caption('Space Invaders')
+pygame.display.set_caption('Space Invaders with Spaceships')
 
-# Player settings
-player_width = 50
-player_height = 50
-player_x = WIDTH // 2 - player_width // 2
-player_y = HEIGHT - 60
-player_speed = 5
-player_lives = 3
+# Matrix for Player (Spaceship) and Enemy (Alien)
+PLAYER_MATRIX = [
+    [0, 0, 1, 1, 0],
+    [0, 1, 0, 0, 1],
+    [1, 1, 1, 1, 1],
+    [0, 0, 1, 1, 0],
+    [0, 0, 0, 0, 0]
+]
 
-# Bullet settings
-bullet_width = 5
-bullet_height = 10
-bullet_speed = 7
-bullets = []
+ENEMY_MATRIX = [
+    [0, 1, 1, 1, 0],
+    [1, 0, 1, 0, 1],
+    [1, 1, 1, 1, 1],
+    [0, 1, 1, 1, 0],
+    [0, 0, 0, 0, 0]
+]
 
-# Enemy settings
-enemy_width = 40
-enemy_height = 40
-enemy_speed = 3
-enemies = []
-enemy_direction = 1  # 1 means moving right, -1 means moving left
+BULLET_MATRIX = [
+    [1],
+    [1],
+    [1]
+]
 
-# Score
-score = 0
+def draw_matrix(matrix, x, y, size=10):
+    for row_index, row in enumerate(matrix):
+        for col_index, cell in enumerate(row):
+            if cell == 1:
+                pygame.draw.rect(screen, WHITE, (x + col_index * size, y + row_index * size, size, size))
 
-# Function to draw player
-def draw_player(x, y):
-    pygame.draw.rect(screen, GREEN, (x, y, player_width, player_height))
+class Player:
+    def __init__(self):
+        self.matrix = PLAYER_MATRIX
+        self.x = WIDTH // 2 - len(self.matrix[0]) * 10 // 2
+        self.y = HEIGHT - 60
+        self.speed = 10  # Increased speed
+        self.lives = 3
 
-# Function to draw a bullet
-def draw_bullet(bullet):
-    pygame.draw.rect(screen, WHITE, (bullet[0], bullet[1], bullet_width, bullet_height))
+    def move(self, mouse_x):
+        self.x = mouse_x - len(self.matrix[0]) * 10 // 2
+        self.x = max(0, min(self.x, WIDTH - len(self.matrix[0]) * 10))
 
-# Function to draw an enemy
-def draw_enemy(x, y):
-    pygame.draw.rect(screen, RED, (x, y, enemy_width, enemy_height))
+    def draw(self):
+        draw_matrix(self.matrix, self.x, self.y)
 
-# Create enemies
-def create_enemies():
-    for i in range(5):
-        for j in range(4):
-            enemy_x = 100 * i + 50
-            enemy_y = 50 * j + 50
-            enemies.append([enemy_x, enemy_y])
+class Bullet:
+    def __init__(self, x, y):
+        self.matrix = BULLET_MATRIX
+        self.x = x
+        self.y = y
+        self.speed = 15  # Increased bullet speed
 
-# Move enemies (left-right motion + down)
-def move_enemies():
-    global player_lives, enemy_direction
-    for enemy in enemies:
-        enemy[0] += enemy_speed * enemy_direction  # Move left-right
-        if enemy[0] <= 0 or enemy[0] >= WIDTH - enemy_width:
-            enemy_direction *= -1  # Reverse direction when hitting the edge
-            for e in enemies:
-                e[1] += 10  # Move all enemies down when the direction reverses
-                if e[1] > HEIGHT - enemy_height:  # Check if an enemy hits the bottom
-                    player_lives -= 1
-                    enemies.remove(e)
+    def move(self):
+        self.y -= self.speed
 
-# Check for collisions
-def check_collisions():
-    global score
-    global enemies, bullets
-    for bullet in bullets[:]:
-        for enemy in enemies[:]:
-            if enemy[0] < bullet[0] < enemy[0] + enemy_width and enemy[1] < bullet[1] < enemy[1] + enemy_height:
-                enemies.remove(enemy)
-                bullets.remove(bullet)
-                score += 10  # Increase score when enemy is hit
+    def draw(self):
+        draw_matrix(self.matrix, self.x, self.y)
+
+class Enemy:
+    def __init__(self, x, y):
+        self.matrix = ENEMY_MATRIX
+        self.x = x
+        self.y = y
+
+    def draw(self):
+        draw_matrix(self.matrix, self.x, self.y)
+
+class Game:
+    def __init__(self):
+        self.player = Player()
+        self.bullets = []
+        self.enemies = []
+        self.enemy_direction = 1
+        self.score = 0
+        self.level = 1
+        self.enemy_speed = 4  # Starting speed
+        self.enemy_rows = 3  # Level 1 has 3 rows of enemies
+        self.create_enemies()
+
+    def create_enemies(self):
+        self.enemies.clear()
+        enemy_count = 5  # Starting with 5 columns
+        for i in range(enemy_count):
+            for j in range(self.enemy_rows):
+                enemy_x = 100 * i + 50
+                enemy_y = 50 * j + 50
+                self.enemies.append(Enemy(enemy_x, enemy_y))
+
+    def move_enemies(self):
+        for enemy in self.enemies[:]:
+            enemy.x += self.enemy_speed * self.enemy_direction  # Adjust speed
+            if enemy.x <= 0 or enemy.x >= WIDTH - len(enemy.matrix[0]) * 10:
+                self.enemy_direction *= -1
+                for e in self.enemies:
+                    e.y += 10
                 break
 
-# Display the score and lives on the screen
-def display_score_and_lives():
-    font = pygame.font.SysFont(None, 30)
-    score_text = font.render(f"Score: {score}", True, WHITE)
-    lives_text = font.render(f"Lives: {player_lives}", True, WHITE)
-    screen.blit(score_text, (10, 10))
-    screen.blit(lives_text, (WIDTH - 150, 10))
+    def check_collisions(self):
+        for bullet in self.bullets[:]:
+            for enemy in self.enemies[:]:
+                if (enemy.x < bullet.x < enemy.x + len(enemy.matrix[0]) * 10 and
+                        enemy.y < bullet.y < enemy.y + len(enemy.matrix) * 10):
+                    self.enemies.remove(enemy)
+                    self.bullets.remove(bullet)
+                    self.score += 10
+                    break
 
-# Game Over screen
-def game_over():
-    font = pygame.font.SysFont(None, 50)
-    game_over_text = font.render("GAME OVER", True, RED)
-    score_text = font.render(f"Final Score: {score}", True, WHITE)
-    screen.blit(game_over_text, (WIDTH // 2 - 150, HEIGHT // 2 - 50))
-    screen.blit(score_text, (WIDTH // 2 - 150, HEIGHT // 2 + 20))
-    pygame.display.flip()
-    pygame.time.delay(3000)  # Show Game Over screen for 3 seconds
+    def display_score_and_lives(self):
+        font = pygame.font.SysFont(None, 30)
+        score_text = font.render(f"Score: {self.score}", True, WHITE)
+        lives_text = font.render(f"Lives: {self.player.lives}", True, WHITE)
+        level_text = font.render(f"Level: {self.level}", True, WHITE)
+        screen.blit(score_text, (10, 10))
+        screen.blit(lives_text, (WIDTH - 150, 10))
+        screen.blit(level_text, (WIDTH // 2 - 50, 10))
 
-# Main game loop
-def main():
-    global player_x, bullets, enemies, player_lives, score, enemy_direction
+    def check_level_up(self):
+        if len(self.enemies) == 0:  # Level up if all enemies are defeated
+            self.level += 1
+            self.enemy_rows += 1  # Add a new row of enemies
+            self.enemy_speed += 0.5  # Increase enemy speed slightly
+            self.create_enemies()  # Create new enemies for the next level
+            self.enemy_direction *= -1  # Change enemy movement direction for each level
 
-    clock = pygame.time.Clock()
-    create_enemies()
-
-    running = True
-    while running:
-        clock.tick(FPS)
-
-        # Event handling
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                running = False
-            elif event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_SPACE:
-                    bullet = [player_x + player_width // 2 - bullet_width // 2, player_y]
-                    bullets.append(bullet)
-
-        # Get mouse position and update player's position
-        mouse_x, _ = pygame.mouse.get_pos()
-        player_x = mouse_x - player_width // 2  # Center player on the mouse x position
-
-        # Limit player's movement to within screen boundaries
-        if player_x < 0:
-            player_x = 0
-        elif player_x > WIDTH - player_width:
-            player_x = WIDTH - player_width
-
-        # Move bullets
-        for bullet in bullets[:]:
-            bullet[1] -= bullet_speed
-            if bullet[1] < 0:
-                bullets.remove(bullet)
-
-        # Move enemies
-        move_enemies()
-
-        # Check for collisions
-        check_collisions()
-
-        # Draw everything
-        screen.fill(BLACK)
-
-        # Draw player
-        draw_player(player_x, player_y)
-
-        # Draw bullets
-        for bullet in bullets:
-            draw_bullet(bullet)
-
-        # Draw enemies
-        for enemy in enemies:
-            draw_enemy(enemy[0], enemy[1])
-
-        # Display score and lives
-        display_score_and_lives()
-
-        # Game Over if no lives left
-        if player_lives <= 0:
-            game_over()
-            running = False
-
-        # Update the display
+    def game_over(self):
+        font = pygame.font.SysFont(None, 50)
+        game_over_text = font.render("GAME OVER", True, (255, 0, 0))
+        score_text = font.render(f"Final Score: {self.score}", True, WHITE)
+        screen.blit(game_over_text, (WIDTH // 2 - game_over_text.get_width() // 2, HEIGHT // 2 - 50))
+        screen.blit(score_text, (WIDTH // 2 - score_text.get_width() // 2, HEIGHT // 2 + 20))
         pygame.display.flip()
+        pygame.time.delay(3000)
 
-    # Quit the game
-    pygame.quit()
+    def run(self):
+        clock = pygame.time.Clock()
+        running = True
 
-# Run the game
+        while running:
+            clock.tick(FPS)  # Frame rate control
+
+            mouse_x, _ = pygame.mouse.get_pos()
+
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    running = False
+                elif event.type == pygame.MOUSEBUTTONDOWN:
+                    if event.button == 1:  # Left mouse button
+                        bullet = Bullet(self.player.x + len(self.player.matrix[0]) * 10 // 2 - 5, self.player.y)
+                        self.bullets.append(bullet)
+                elif event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_SPACE:  # Spacebar to shoot
+                        bullet = Bullet(self.player.x + len(self.player.matrix[0]) * 10 // 2 - 5, self.player.y)
+                        self.bullets.append(bullet)
+
+            self.player.move(mouse_x)
+
+            for bullet in self.bullets[:]:
+                bullet.move()
+                if bullet.y < 0:
+                    self.bullets.remove(bullet)
+
+            self.move_enemies()
+            self.check_collisions()
+
+            for enemy in self.enemies:
+                if enemy.y > HEIGHT - len(enemy.matrix) * 10:
+                    self.player.lives -= 1
+                    self.enemies.remove(enemy)
+
+            self.check_level_up()  # Check if level is up after clearing all enemies
+
+            if self.player.lives <= 0:
+                self.game_over()
+                running = False
+
+            screen.fill(BLACK)
+            self.player.draw()
+
+            for bullet in self.bullets:
+                bullet.draw()
+
+            for enemy in self.enemies:
+                enemy.draw()
+
+            self.display_score_and_lives()
+            pygame.display.flip()
+
+        pygame.quit()
+
+# Make sure to use __name__ and __main__
 if __name__ == "__main__":
-    main()
+    Game().run()
